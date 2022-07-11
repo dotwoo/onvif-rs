@@ -1,0 +1,6 @@
+HIKVISION:
+  onvif: "hx1235698"
+  admin: "hx1235698"
+
+Dahua:
+  admin: "hx1235698"

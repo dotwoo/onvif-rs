@@ -1,0 +1,30 @@
+[package]
+name = "discover"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-recursion = "1.0.0"
+async-stream = "0.3.0"
+async-trait = "0.1.41"
+futures-core = "0.3.8"
+futures-util = "0.3.8"
+serde_yaml = "0.8.24"
+anyhow = "1.0.58"
+url = "2.2.0"
+onvif = { version = "0.1.0", path = "../onvif" }
+tokio = { version = "1.0.1", features = ["time"] }
+tracing = "0.1.26"
+tracing-subscriber = "0.3.14"
+time = "0.3.11"
+
+
+[dev-dependencies]
+tokio = { version = "1.0.1", features = ["full"] }
+futures-util = "0.3.8"
+structopt = "0.3.21"
+
+# [build]
+# rustflags = ["--cfg", "tracing_unstable"]
