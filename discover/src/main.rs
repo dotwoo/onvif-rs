@@ -4,12 +4,14 @@ use onvif::{discovery, schema, soap};
 use serde_yaml;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::ERROR)
+        .init();
     let conf_path = "conf.yaml";
     // let conf = std::fs::read_to_string(conf_path)?.as_str();
     let f = std::fs::File::open(conf_path)?;
@@ -45,20 +47,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     addr.url.host().unwrap().to_string()
                 );
 
-                // println!("{} {}", addr.name.unwrap().as_str(), &uri);
                 get_stream(addr.name.unwrap().as_str(), &uri, x)
                     .await
-                    .unwrap_or_else(|error| {
-                        println!("{}", error);
+                    .unwrap_or_else(|_error| {
+                        // println!("{}", error);
                     });
-                println!("{} finished", uri);
             }
         })
         .await;
-
-    // for (n, u) in last.lock().unwrap().iter() {
-    //     println!("last {}  {}", n, u);
-    // }
 
     Ok(())
 }
@@ -81,14 +77,12 @@ async fn get_stream(
                     let r = get_stream_uris(&clients).await;
                     if let Ok(_r) = r {
                         return Ok(());
-                    } else {
-                        println!("{} {} continue", name, r.unwrap_err());
                     }
                 };
             }
         }
         None => {
-            warn!("Device found no match: {}\t {}", name, uri);
+            error!("Device found no match config: {}\t {}", name, uri);
             let c = Clients::new(uri, Some("admin"), Some("hx1235698")).await;
             if let Ok(c) = c {
                 let clients = c;
