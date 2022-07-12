@@ -4,7 +4,6 @@ use onvif::{discovery, schema, soap};
 use serde_yaml;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use tokio::time;
 use tracing::{debug, warn};
 use url::Url;
 
@@ -31,8 +30,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     use futures_util::stream::StreamExt;
     const MAX_CONCURRENT_JUMPERS: usize = 100;
+    // let hosts: Arc<Mutex<Vec<(&str, &str)>>> = Arc::new(Mutex::new(Vec::new()));
+    // let last = hosts.clone();
 
-    discovery::discover(std::time::Duration::from_secs(100))
+    discovery::discover(std::time::Duration::from_secs(1))
         .await
         .unwrap()
         .for_each_concurrent(MAX_CONCURRENT_JUMPERS, move |addr: discovery::Device| {
@@ -43,16 +44,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     addr.url.scheme(),
                     addr.url.host().unwrap().to_string()
                 );
-                get_stream(addr.name.unwrap().as_str(), &uri, x.clone())
+
+                // println!("{} {}", addr.name.unwrap().as_str(), &uri);
+                get_stream(addr.name.unwrap().as_str(), &uri, x)
                     .await
                     .unwrap_or_else(|error| {
                         println!("{}", error);
                     });
+                println!("{} finished", uri);
             }
         })
         .await;
 
-    time.sleep(std::time::Duration::from_secs(30)).await;
+    // for (n, u) in last.lock().unwrap().iter() {
+    //     println!("last {}  {}", n, u);
+    // }
+
     Ok(())
 }
 
@@ -65,27 +72,30 @@ async fn get_stream(
     // let mut clients: Clients;
     match users {
         Some(users) => {
-            warn!("Device found match: {}\t {}", name, uri);
+            warn!("Device found match: {}\t {} {}", name, uri, users.len());
             for (user, pass) in users.iter() {
                 warn!("\t{}:{}", user, pass);
                 let c = Clients::new(uri, Some(*user), Some(*pass)).await;
                 if let Ok(c) = c {
                     let clients = c;
-                    get_stream_uris(&clients).await.unwrap();
-                    break;
+                    let r = get_stream_uris(&clients).await;
+                    if let Ok(_r) = r {
+                        return Ok(());
+                    } else {
+                        println!("{} {} continue", name, r.unwrap_err());
+                    }
                 };
             }
-            let clients = Clients::new(uri, Some("admin"), Some("hx1235698"))
-                .await
-                .unwrap();
-            get_stream_uris(&clients).await.unwrap();
         }
         None => {
             warn!("Device found no match: {}\t {}", name, uri);
-            let clients = Clients::new(uri, Some("admin"), Some("hx1235698"))
-                .await
-                .unwrap();
-            get_stream_uris(&clients).await.unwrap();
+            let c = Clients::new(uri, Some("admin"), Some("hx1235698")).await;
+            if let Ok(c) = c {
+                let clients = c;
+                get_stream_uris(&clients).await.unwrap_or_else(|error| {
+                    warn!("{}", error);
+                });
+            };
         }
     }
 
@@ -112,8 +122,12 @@ impl Clients {
             _ => panic!("username and password must be specified together"),
         };
         let base_uri = uri;
-        let devicemgmt_uri =
-            Url::parse(format!("{}/onvif/device_service", base_uri).as_str()).unwrap();
+        let devicemgmt_uri = Url::parse(format!("{}/onvif/device_service", base_uri).as_str());
+        if let Err(e) = devicemgmt_uri {
+            return Err(format!("{}", e));
+        }
+        let devicemgmt_uri = devicemgmt_uri.unwrap();
+
         let mut out = Self {
             devicemgmt: soap::client::ClientBuilder::new(&devicemgmt_uri)
                 .credentials(creds.clone())
