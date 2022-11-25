@@ -26,12 +26,6 @@ macro_rules! debug {
     }
 }
 
-macro_rules! warn {
-    ($($arg:tt)+) => {
-        event!(tracing::Level::WARN, $($arg)+)
-    };
-}
-
 #[derive(Clone)]
 pub struct Client {
     client: reqwest::Client,
@@ -141,12 +135,12 @@ enum RequestAuthType {
 #[async_trait]
 impl Transport for Client {
     async fn request(&self, message: &str) -> Result<String, Error> {
-        let result = match self.config.auth_type {
+        match self.config.auth_type {
             AuthType::Any => {
                 match self.request_with_digest(message).await {
                     Ok(success) => Ok(success),
                     Err(Error::Authorization(e)) => {
-                        warn!(self, "Failed to authorize with Digest auth: {}. Trying UsernameToken auth ...", e);
+                        debug!(self, "Failed to authorize with Digest auth: {}. Trying UsernameToken auth ...", e);
                         self.request_with_username_token(message).await
                     }
                     Err(e) => Err(e),
@@ -154,14 +148,7 @@ impl Transport for Client {
             }
             AuthType::Digest => self.request_with_digest(message).await,
             AuthType::UsernameToken => self.request_with_username_token(message).await,
-        };
-
-        match &result {
-            Ok(response) => debug!(self, "Request succeeded: {}", response),
-            Err(e) => warn!(self, "Request failed: {:?}", e),
         }
-
-        result
     }
 }
 
